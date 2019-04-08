@@ -52,6 +52,9 @@ def EqualSplitTrainVal(X, y, validation_split):
     tr_indices = np.asarray(tr_indices, dtype=np.int32)
     val_indices = np.asarray(val_indices, dtype=np.int32)
 
+    np.random.shuffle(tr_indices)
+    np.random.shuffle(val_indices)
+
     X_val = X[val_indices]
     y_val = y[val_indices]
     X_tr = X[tr_indices]

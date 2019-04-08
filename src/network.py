@@ -3,14 +3,16 @@ import keras
 def conv_bn_relu(X,
                  filters,
                  ksize=3,
+                 strides=1,
                  regularizer_strength=1e-4):
     regularizer = keras.regularizers.l2(regularizer_strength)
     net = keras.layers.Conv2D(filters=filters,
                               kernel_size=(ksize, ksize),
-                              strides=(1, 1),
+                              strides=strides,
                               kernel_regularizer=regularizer,
                               padding='SAME',
                               activation="linear",
+                              kernel_initializer=keras.initializers.he_normal(),
                               )(X)
     net = keras.layers.BatchNormalization()(net)
     net = keras.layers.ReLU()(net)
@@ -18,50 +20,75 @@ def conv_bn_relu(X,
 
 def residual_block(X,
                    filters,
-                   regularizer_strength=1e-4):
+                   regularizer_strength=1e-4,
+                   dropout=0.0):
     regularizer = keras.regularizers.l2(regularizer_strength)
-    net = conv_bn_relu(X, filters=filters, regularizer_strength=regularizer_strength)
-    net = conv_bn_relu(net, filters=filters, regularizer_strength=regularizer_strength)
+    net = keras.layers.Conv2D(filters=filters,
+                              kernel_size=(3, 3),
+                              strides=(1, 1),
+                              kernel_regularizer=regularizer,
+                              padding='SAME',
+                              activation="linear",
+                              kernel_initializer=keras.initializers.he_normal(),
+                              )(X)
+    net = keras.layers.BatchNormalization()(net)
+    net = keras.layers.ReLU()(net)
+
+    net = keras.layers.Dropout(rate=dropout)(net)
+
+    net = keras.layers.Conv2D(filters=filters,
+                              kernel_size=(3, 3),
+                              strides=(1, 1),
+                              kernel_regularizer=regularizer,
+                              padding='SAME',
+                              activation="linear",
+                              kernel_initializer=keras.initializers.he_normal(),
+                              )(net)
+    net = keras.layers.BatchNormalization()(net)
+
     if X.get_shape()[-1] != net.get_shape()[-1]:
         X_id = keras.layers.Conv2D(filters=filters,
                                    kernel_size=(1, 1),
                                    strides=(1, 1),
                                    kernel_regularizer=regularizer,
                                    padding='SAME',
-                                   activation='linear')(X)
+                                   activation='linear',
+                                   kernel_initializer=keras.initializers.he_normal())(X)
+        X_id = keras.layers.BatchNormalization()(X_id)
+
         net = keras.layers.Add()([net, X_id])
     else:
         net = keras.layers.Add()([net, X])
+
+    net = keras.layers.ReLU()(net)
     return net
 
 
 
 def ResNet_18(input_shape=(28, 28, 1),
-              regularizer_strength=1e-4,
-              scale=1.0):
-    regularizer = keras.regularizers.l2(regularizer_strength)
-    net_in = keras.layers.Input(shape=input_shape)
-    net = conv_bn_relu(net_in, ksize=5, filters=int(64*scale), regularizer_strength=regularizer_strength)
-    print(net.get_shape())
-    net = keras.layers.MaxPool2D(strides=2, pool_size=2, padding='SAME')(net)
-    net = residual_block(net, filters=int(128*scale), regularizer_strength=regularizer_strength)
-    net = residual_block(net, filters=int(128*scale), regularizer_strength=regularizer_strength)
-    net = keras.layers.MaxPool2D(strides=2, pool_size=2, padding='SAME')(net)
-    print(net.get_shape())
-    net = residual_block(net, filters=int(256*scale), regularizer_strength=regularizer_strength)
-    net = residual_block(net, filters=int(256*scale), regularizer_strength=regularizer_strength)
-    net = residual_block(net, filters=int(256*scale), regularizer_strength=regularizer_strength)
-    net = residual_block(net, filters=int(256*scale), regularizer_strength=regularizer_strength)
-    #net = keras.layers.MaxPool2D(strides=2, pool_size=2, padding='SAME')(net)
-    print(net.get_shape())
-    net = residual_block(net, filters=int(512*scale), regularizer_strength=regularizer_strength)
-    net = residual_block(net, filters=int(512*scale), regularizer_strength=regularizer_strength)
-    net = residual_block(net, filters=int(512*scale), regularizer_strength=regularizer_strength)
-    net = residual_block(net, filters=int(512*scale), regularizer_strength=regularizer_strength)
-    net = residual_block(net, filters=int(512*scale), regularizer_strength=regularizer_strength)
-    net = residual_block(net, filters=int(512*scale), regularizer_strength=regularizer_strength)
+              regularizer_strength=1e-4):
 
-    net = keras.layers.Flatten()(net)
+    print(regularizer_strength)
+
+    tower_2_stage = 4
+    tower_3_stage = 6
+    tower_4_stage = 8
+
+    net_in = keras.layers.Input(shape=input_shape)
+    net = conv_bn_relu(net_in, ksize=7, filters=32, strides=2, regularizer_strength=regularizer_strength)
+
+    for i in range(tower_2_stage):
+        net = residual_block(net, filters=48, regularizer_strength=regularizer_strength, dropout=0.1)
+    net = keras.layers.MaxPool2D(strides=2, pool_size=2, padding='SAME')(net)
+
+    for i in range(tower_3_stage):
+        net = residual_block(net, filters=64, regularizer_strength=regularizer_strength, dropout=0.1)
+    net = keras.layers.MaxPool2D(strides=2, pool_size=2, padding='SAME')(net)
+
+    for i in range(tower_4_stage):
+        net = residual_block(net, filters=96, regularizer_strength=regularizer_strength, dropout=0.1)
+
+    net = keras.layers.GlobalAvgPool2D()(net)
 
     net = keras.layers.Dense(10, activation='softmax')(net)
 
@@ -132,27 +159,17 @@ def VGG_9(input_shape=(28, 28, 1),
     model = keras.Sequential()
 
     model.add(keras.layers.Conv2D(filters=32,
-                                  kernel_size=(3, 3),
+                                  kernel_size=(7, 7),
                                   strides=(1, 1),
                                   kernel_regularizer=regularizer,
                                   padding='SAME',
                                   activation="linear",
                                   input_shape=input_shape
                                   ))
-    model.add(keras.layers.BatchNormalization())
+    model.add(keras.layers.BatchNormalization(momentum=.997))
     model.add(keras.layers.ReLU())
 
-    model.add(keras.layers.Conv2D(filters=32,
-                                  kernel_size=(3, 3),
-                                  strides=(1, 1),
-                                  kernel_regularizer=regularizer,
-                                  padding='SAME',
-                                  activation="linear",
-                                  ))
-    model.add(keras.layers.BatchNormalization())
-    model.add(keras.layers.ReLU())
-
-    model.add(keras.layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2), padding='same'))
+    model.add(keras.layers.MaxPool2D(pool_size=(3, 3), strides=(2, 2), padding='same'))
 
     model.add(keras.layers.Conv2D(filters=64,
                                   kernel_size=(3, 3),
@@ -161,28 +178,7 @@ def VGG_9(input_shape=(28, 28, 1),
                                   padding='SAME',
                                   activation="linear",
                                   ))
-    model.add(keras.layers.BatchNormalization())
-    model.add(keras.layers.ReLU())
-
-
-    model.add(keras.layers.Conv2D(filters=64,
-                                  kernel_size=(3, 3),
-                                  strides=(1, 1),
-                                  kernel_regularizer=regularizer,
-                                  padding='SAME',
-                                  activation="linear",
-                                  ))
-    model.add(keras.layers.BatchNormalization())
-    model.add(keras.layers.ReLU())
-
-    model.add(keras.layers.Conv2D(filters=64,
-                                  kernel_size=(3, 3),
-                                  strides=(1, 1),
-                                  kernel_regularizer=regularizer,
-                                  padding='SAME',
-                                  activation="linear",
-                                  ))
-    model.add(keras.layers.BatchNormalization())
+    model.add(keras.layers.BatchNormalization(momentum=.997))
     model.add(keras.layers.ReLU())
 
     model.add(keras.layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2), padding='same'))
@@ -194,7 +190,7 @@ def VGG_9(input_shape=(28, 28, 1),
                                   padding='SAME',
                                   activation="linear",
                                   ))
-    model.add(keras.layers.BatchNormalization())
+    model.add(keras.layers.BatchNormalization(momentum=.997))
     model.add(keras.layers.ReLU())
 
     model.add(keras.layers.Conv2D(filters=128,
@@ -204,34 +200,69 @@ def VGG_9(input_shape=(28, 28, 1),
                                   padding='SAME',
                                   activation="linear",
                                   ))
-    model.add(keras.layers.BatchNormalization())
+    model.add(keras.layers.BatchNormalization(momentum=.997))
     model.add(keras.layers.ReLU())
 
-    model.add(keras.layers.Conv2D(filters=128,
+    model.add(keras.layers.Conv2D(filters=256,
                                   kernel_size=(3, 3),
                                   strides=(1, 1),
                                   kernel_regularizer=regularizer,
                                   padding='SAME',
                                   activation="linear",
                                   ))
-    model.add(keras.layers.BatchNormalization())
+    model.add(keras.layers.BatchNormalization(momentum=.997))
     model.add(keras.layers.ReLU())
 
     model.add(keras.layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2), padding='same'))
 
-    model.add(keras.layers.Flatten())
 
-    model.add(keras.layers.Dense(1024, activation='relu',
+    model.add(keras.layers.Conv2D(filters=256,
+                                  kernel_size=(3, 3),
+                                  strides=(1, 1),
+                                  kernel_regularizer=regularizer,
+                                  padding='SAME',
+                                  activation="linear",
+                                  ))
+    model.add(keras.layers.BatchNormalization(momentum=.997))
+    model.add(keras.layers.ReLU())
+
+    model.add(keras.layers.Conv2D(filters=256,
+                                  kernel_size=(3, 3),
+                                  strides=(1, 1),
+                                  kernel_regularizer=regularizer,
+                                  padding='SAME',
+                                  activation="linear",
+                                  ))
+    model.add(keras.layers.BatchNormalization(momentum=.997))
+    model.add(keras.layers.ReLU())
+
+    model.add(keras.layers.Conv2D(filters=256,
+                                  kernel_size=(3, 3),
+                                  strides=(1, 1),
+                                  kernel_regularizer=regularizer,
+                                  padding='SAME',
+                                  activation="linear",
+                                  ))
+    model.add(keras.layers.BatchNormalization(momentum=.997))
+    model.add(keras.layers.ReLU())
+
+    model.add(keras.layers.GlobalAvgPool2D())
+
+    #model.add(keras.layers.Flatten())
+
+    model.add(keras.layers.Dense(512, activation='linear',
                                  kernel_regularizer=regularizer,
                                  ))
-    model.add(keras.layers.BatchNormalization())
+    model.add(keras.layers.BatchNormalization(momentum=.997))
     model.add(keras.layers.ReLU())
+    model.add(keras.layers.Dropout(0.5))
 
-    model.add(keras.layers.Dense(1024, activation='relu',
+    model.add(keras.layers.Dense(512, activation='linear',
                                  kernel_regularizer=regularizer,
                                  ))
-    model.add(keras.layers.BatchNormalization())
+    model.add(keras.layers.BatchNormalization(momentum=.997))
     model.add(keras.layers.ReLU())
+    model.add(keras.layers.Dropout(0.5))
 
     model.add(keras.layers.Dense(10, activation='softmax',
                                  ))

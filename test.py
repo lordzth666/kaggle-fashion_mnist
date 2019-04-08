@@ -30,5 +30,7 @@ def main():
             else:
                 fp.write('%d,%d' % (i, id))
 
+    for i in range(10):
+        print((np.argmax(y) == i).mean())
 if __name__ == "__main__":
     main()
