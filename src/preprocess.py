@@ -1,5 +1,4 @@
 import numpy as np
-import cv2
 
 def SplitTrainVal(X, y, validation_split=.2):
     np.random.seed()

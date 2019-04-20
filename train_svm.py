@@ -11,11 +11,13 @@ test_img_name = './dataset/test_images.npy'
 import argparse
 
 def main(args):
+    # Load the data
     X = np.load(train_img_name)
     y = np.load(train_label_name)
     _max = np.max(X)
     _min = np.min(X)
 
+    # Normalize input to [0,1].
     X = (X - _min) / (_max - _min)
     indices = np.arange(np.shape(X)[0])
     np.random.shuffle(indices)
@@ -36,6 +38,7 @@ def main(args):
         pickle.dump(model, fp)
 
 if __name__ == "__main__":
+    # Input the settings
     parser = argparse.ArgumentParser()
     parser.add_argument("--C", type=float, help="Penality term of SVM Classifier", required=True, default=1)
     parser.add_argument("--kernel", type=str, help="Kernel function", nargs='?', default='rbf')

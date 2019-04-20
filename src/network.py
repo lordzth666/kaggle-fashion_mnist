@@ -1,5 +1,11 @@
 import keras
 
+# Network Model Zoo.
+# Supports: Wide ResNet
+#           LeNet_5
+#           VGG_10
+
+
 def conv_bn_relu(X,
                  filters,
                  ksize=3,
@@ -63,37 +69,6 @@ def residual_block(X,
 
     net = keras.layers.ReLU()(net)
     return net
-
-
-def ResNet_18(input_shape=(28, 28, 1),
-              regularizer_strength=1e-4):
-
-    print(regularizer_strength)
-
-    tower_2_stage = 4
-    tower_3_stage = 6
-    tower_4_stage = 8
-
-    net_in = keras.layers.Input(shape=input_shape)
-    net = conv_bn_relu(net_in, ksize=7, filters=32, strides=2, regularizer_strength=regularizer_strength)
-
-    for i in range(tower_2_stage):
-        net = residual_block(net, filters=48, regularizer_strength=regularizer_strength, dropout=0.1)
-    net = keras.layers.MaxPool2D(strides=2, pool_size=2, padding='SAME')(net)
-
-    for i in range(tower_3_stage):
-        net = residual_block(net, filters=64, regularizer_strength=regularizer_strength, dropout=0.1)
-    net = keras.layers.MaxPool2D(strides=2, pool_size=2, padding='SAME')(net)
-
-    for i in range(tower_4_stage):
-        net = residual_block(net, filters=96, regularizer_strength=regularizer_strength, dropout=0.1)
-
-    net = keras.layers.GlobalAvgPool2D()(net)
-
-    net = keras.layers.Dense(10, activation='softmax')(net)
-
-    return keras.models.Model(inputs=net_in, outputs=net)
-
 
 
 def Wide_ResNet(input_shape=(28, 28, 1),
@@ -179,6 +154,7 @@ def LeNet_5(input_shape=(28, 28, 1),
 
 
 
+# VGG10: The model we used for evaluation.
 def VGG_10(input_shape=(28, 28, 1),
            regularizer_strength=1e-4,
            dropout=0.5,
@@ -187,7 +163,7 @@ def VGG_10(input_shape=(28, 28, 1),
     regularizer = keras.regularizers.l2(regularizer_strength)
     model = keras.Sequential()
 
-    model.add(keras.layers.Conv2D(filters=64,
+    model.add(keras.layers.Conv2D(filters=32,
                                   kernel_size=(3, 3),
                                   strides=(1, 1),
                                   kernel_initializer=initializer,
@@ -201,7 +177,7 @@ def VGG_10(input_shape=(28, 28, 1),
     model.add(keras.layers.ReLU())
 
 
-    model.add(keras.layers.Conv2D(filters=64,
+    model.add(keras.layers.Conv2D(filters=32,
                                   kernel_size=(3, 3),
                                   strides=(1, 1),
                                   kernel_initializer=initializer,
