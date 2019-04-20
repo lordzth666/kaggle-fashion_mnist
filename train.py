@@ -4,6 +4,12 @@ from src.network import *
 import keras
 import math
 
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
+config = tf.ConfigProto()
+config.gpu_options.per_process_gpu_memory_fraction = 0.20
+set_session(tf.Session(config=config))
+
 train_label_name = './dataset/train_labels.npy'
 train_img_name = './dataset/train_images.npy'
 test_img_name = './dataset/test_images.npy'
@@ -15,7 +21,15 @@ _var = 0.352901
 
 MAX_H = 28
 MAX_W = 28
-MASK_RATIO = 0.25
+MASK_RATIO = 0.50
+
+
+MAX_EPOCHS = 100
+WARMUP_EPOCH = 1
+WARMUP_DECAY = 0.75
+LR_DECAY = 0.1
+INITIAL_LR = 0.01
+DECAY_EPOCH = [MAX_EPOCHS*0.30, MAX_EPOCHS*0.60, MAX_EPOCHS*0.90]
 
 def preprocess_func(img):
     start_w = np.random.randint(0, MAX_W)
@@ -32,16 +46,18 @@ def preprocess_func(img):
     return img_aug
 
 def lr_schedule(epoch, lr):
-    if epoch == 2:
-        return lr * 10
+    if epoch == 0:
+        return lr * WARMUP_DECAY
+    elif epoch == WARMUP_EPOCH:
+        return lr / WARMUP_DECAY
     else:
-        if epoch == 50 or epoch == 75:
-            return lr * 0.1
+        if epoch in DECAY_EPOCH:
+            return lr * LR_DECAY
         else:
             return lr
 
 
-def main():
+def main(args):
 
 
     X = np.load(train_img_name)
@@ -61,30 +77,43 @@ def main():
 
     datagen = keras.preprocessing.image.ImageDataGenerator(
                                         rotation_range=0,
-                                        width_shift_range=3./28,
-                                        height_shift_range=3./28,
-                                        horizontal_flip=True,
-                                        vertical_flip=False,
-                                        preprocessing_function=preprocess_func)
+                                        width_shift_range=0./28,
+                                        height_shift_range=0./28,
+                                        horizontal_flip=False,
+                                        vertical_flip=False)
+
     datagen.fit(X_tr, augment=True)
 
-    model = ResNet_18(input_shape=(28, 28, 1),
-                      regularizer_strength=1e-4)
+    # WRN-28-2
+    #model = Wide_ResNet(input_shape=(28, 28, 1),
+    #                    regularizer_strength=1e-4,
+    #                    n=4,
+    #                    k=2,
+    #                    dropout=.1)
 
-    model.compile(optimizer=keras.optimizers.sgd(lr=0.01, momentum=.9, nesterov=False),
+    # VGG-10
+    model = VGG_10(input_shape=(28, 28, 1),
+                   regularizer_strength=1e-16,
+                   dropout=0.5,
+                   batchnorm=True)
+
+    model.compile(optimizer=keras.optimizers.sgd(lr=INITIAL_LR, momentum=.9, nesterov=True),
                   loss=keras.losses.sparse_categorical_crossentropy,
                   metrics=['accuracy'])
 
     model.summary()
 
     lr_scheduler = keras.callbacks.LearningRateScheduler(schedule=lr_schedule, verbose=1)
-    model_checkpoint = keras.callbacks.ModelCheckpoint('./models/model.ckpt', save_best_only=True, monitor='val_acc')
+    model_checkpoint = keras.callbacks.ModelCheckpoint(args['save_dir'], save_best_only=True, monitor='val_acc')
 
-    batch_size = 128
+    batch_size = 256
     model.fit_generator(datagen.flow(X_tr, y_tr, batch_size=batch_size),
-                        epochs=300, steps_per_epoch=len(X_tr)/batch_size,
+                        epochs=MAX_EPOCHS, steps_per_epoch=len(X_tr)/batch_size,
                         validation_data=(X_val, y_val),
                         callbacks=[lr_scheduler, model_checkpoint])
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--save_dir", required=True, type=str, help="Model save dir", default=None)
+    args = vars(parser.parse_args())
+    main(args)

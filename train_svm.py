@@ -22,10 +22,11 @@ def main(args):
     X = X[indices]
     y = y[indices]
 
-    X_tr, y_tr, X_val, y_val = EqualSplitTrainVal(X, y, validation_split=0.2)
+    X_tr, y_tr, X_val, y_val = EqualSplitTrainVal(X, y, validation_split=0.1)
 
     print(y_tr)
-    model = SVC(C=args.C, kernel=args.kernel, degree=args.degree, verbose=1, max_iter=10000)
+    model = SVC(C=args.C, kernel=args.kernel, degree=args.degree, verbose=1,
+                max_iter=10000, decision_function_shape='ovr')
     model.fit(X_tr, y_tr)
 
     print("Training accuracy: %f"  %model.score(X_tr, y_tr))
@@ -36,8 +37,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--C", type=int, help="Penality term of SVM Classifier", required=True, default=1)
+    parser.add_argument("--C", type=float, help="Penality term of SVM Classifier", required=True, default=1)
     parser.add_argument("--kernel", type=str, help="Kernel function", nargs='?', default='rbf')
-    parser.add_argument("--degree", type=str, help="Degree of polynomial kernel", nargs='?', default=3)
+    parser.add_argument("--degree", type=int, help="Degree of polynomial kernel", nargs='?', default=3)
     args = parser.parse_args()
     main(args)
