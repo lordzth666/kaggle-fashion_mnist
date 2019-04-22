@@ -24,16 +24,21 @@ def main(args):
     X = X[indices]
     y = y[indices]
 
+    # Split train and validation data
     X_tr, y_tr, X_val, y_val = EqualSplitTrainVal(X, y, validation_split=0.1)
 
     print(y_tr)
+    # Build the SVC models
     model = SVC(C=args.C, kernel=args.kernel, degree=args.degree, verbose=1,
                 max_iter=10000, decision_function_shape='ovr')
+    # Train the model
     model.fit(X_tr, y_tr)
 
+    # Evaluate training and validation accuracy
     print("Training accuracy: %f"  %model.score(X_tr, y_tr))
     print("Validation accuracy: %f"  %model.score(X_val, y_val))
 
+    # Dump model
     with open("models/svm_model/svm_%d" %args.C, 'wb') as fp:
         pickle.dump(model, fp)
 
